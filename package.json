@@ -1,0 +1,21 @@
+{
+  "name": "architest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local-first visual contract testing tool that converts Docker + OpenAPI systems into an executable architecture map.",
+  "workspaces": [
+    "packages/frontend",
+    "packages/backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/backend & npm run dev --workspace=packages/frontend",
+    "build": "npm run build --workspaces",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm test --workspaces"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

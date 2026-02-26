@@ -1,0 +1,32 @@
+services:
+  user-api:
+    build: ./services/user-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  order-api:
+    build: ./services/order-api
+    ports:
+      - "9090:9090"
+    depends_on:
+      - postgres
+      - user-api
+
+  frontend:
+    build: ./services/frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - user-api
+      - order-api
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
