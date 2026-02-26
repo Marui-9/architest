@@ -1,0 +1,214 @@
+ArchiTest is a local-first developer tool that converts your Docker-based architecture into a visual integration map where every service connection can be executed and verified as a contract test.
+
+It is not a diagramming tool.
+It is not an API client.
+It is not a test framework.
+
+It is a visual contract execution layer on top of your existing system.
+
+Core Experience (MVP)
+1. Boot
+
+User runs:
+
+docker run -p 3000:3000 architest/core
+
+Opens localhost:3000.
+
+Dark-mode graph canvas appears.
+
+2. Repository Connection
+
+User selects local project folder.
+
+ArchiTest scans:
+
+docker-compose.yml
+
+OpenAPI files (default paths only, configurable later)
+
+No AI. Deterministic parsing only.
+
+3. Architecture Map Generation
+
+ArchiTest builds a graph:
+
+Nodes (Boxes)
+
+Derived from Docker services:
+
+frontend
+
+user-api
+
+postgres
+
+Each node shows:
+
+Service name
+
+Exposed port
+
+OpenAPI availability indicator
+
+Edges (Arrows)
+
+Edges are created when:
+
+A service depends_on another service in Docker
+
+AND the target service exposes an OpenAPI spec
+
+Edges represent:
+
+"Consumer service → Provider API contract"
+
+4. Edge Inspection Panel
+
+Click an edge.
+
+Right-side panel shows:
+
+Detected base URL
+
+List of endpoints from OpenAPI
+
+Method + route
+
+Expected response codes
+
+Response schema summary
+
+User selects one endpoint.
+
+5. Generate & Run Contract Test
+
+When clicked:
+
+ArchiTest generates a Playwright API test internally using:
+
+Playwright API testing mode.
+
+The generated test does:
+
+Send request to service container
+
+Validate:
+
+Status code matches spec
+
+Response matches OpenAPI schema
+
+It does not:
+
+Assert business logic
+
+Validate DB state
+
+Require auth flows (initially)
+
+6. Visual Feedback
+
+Edge states:
+
+Gray: Not tested
+
+Green: Contract verified
+
+Red: Contract failed
+
+Yellow: Spec mismatch detected
+
+Hovering edge shows:
+
+Last run timestamp
+
+Response time
+
+Status code
+
+Failure reason (if any)
+
+This transforms the architecture diagram into a live system map.
+
+What the MVP Explicitly Does NOT Do
+
+To avoid overreach:
+
+No browser automation
+
+No test editing UI
+
+No multi-environment support
+
+No CI integration
+
+No AI-generated tests
+
+No drift detection beyond basic spec mismatch
+
+That is Phase 2+.
+
+The Psychological Hook
+
+The user sees:
+
+Their real architecture
+
+Their real API contracts
+
+Their real containers
+
+Tested instantly
+
+Reflected visually
+
+The green arrow moment is the product.
+
+Differentiation from Existing Tools
+Tool	What It Does	Why ArchiTest Is Different
+Postman	Manual API testing	Not architecture-aware
+Swagger UI	Spec visualization	Not executable system-wide
+Playwright	Code-based testing	No architectural abstraction
+
+ArchiTest’s abstraction layer is:
+
+Service edge = executable contract.
+
+That is the innovation.
+
+Ideal Early Adopter
+
+Teams using Docker Compose locally
+
+Backend-first SaaS startups
+
+Platform engineers enforcing API contracts
+
+Microservice teams with OpenAPI discipline
+
+Not:
+
+Legacy monolith shops
+
+No-Docker teams
+
+No-spec teams
+
+Future Expansion Path (After MVP Success)
+
+Authentication helpers (token auto-injection)
+
+Frontend → API E2E using Playwright browser mode
+
+CI mode with JSON export
+
+Drift detection on PRs
+
+Historical integration health tracking
+
+Multi-repo service graph
+
+Final Refined Positioning Statement
+
+ArchiTest is a local-first visual contract testing tool that converts Docker + OpenAPI systems into an executable architecture map, allowing teams to see and verify service integrations instantly.
