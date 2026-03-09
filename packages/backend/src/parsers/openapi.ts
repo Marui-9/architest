@@ -93,7 +93,17 @@ export function parseOpenAPISpec(filePath: string): OpenAPIResult {
     throw new Error(`OpenAPI spec file not found: ${filePath}`);
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8');
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, 'utf-8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') {
+      throw new Error(`Permission denied reading ${filePath}. Check file permissions.`);
+    }
+    throw new Error(`Cannot read ${filePath}: ${(err as Error).message ?? String(err)}`);
+  }
+
   const ext = path.extname(filePath).toLowerCase();
 
   let doc: Record<string, unknown>;
@@ -104,8 +114,16 @@ export function parseOpenAPISpec(filePath: string): OpenAPIResult {
       doc = yaml.load(content) as Record<string, unknown>;
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown parse error';
-    throw new Error(`Failed to parse OpenAPI spec ${filePath}: ${message}`);
+    const isJson = ext === '.json';
+    const format = isJson ? 'JSON' : 'YAML';
+    const yamlErr = err as { mark?: { line?: number; column?: number }; message?: string };
+    const position =
+      !isJson && yamlErr.mark
+        ? ` at line ${(yamlErr.mark.line ?? 0) + 1}, column ${(yamlErr.mark.column ?? 0) + 1}`
+        : '';
+    throw new Error(
+      `Malformed ${format} in OpenAPI spec ${filePath}${position}: ${yamlErr.message ?? String(err)}`,
+    );
   }
 
   if (!doc || typeof doc !== 'object') {
@@ -223,25 +241,52 @@ function extractResponses(
 }
 
 /**
- * Basic $ref resolution — one level deep.
- * If the object has a $ref pointing to #/components/schemas/X or #/definitions/X,
- * replace it with the actual schema.
+ * Resolve $ref references in a schema object.
+ * Handles top-level $ref, and recursively resolves $ref inside nested fields
+ * (e.g. `items`, `properties`, `additionalProperties`).
  */
 function resolveRef(
   obj: Record<string, unknown>,
   schemaMap: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (!obj.$ref || typeof obj.$ref !== 'string') return obj;
-
-  const ref = obj.$ref;
-  const match = ref.match(/#\/(?:components\/schemas|definitions)\/(.+)/);
-  if (!match) return obj;
-
-  const schemaName = match[1];
-  const resolved = schemaMap[schemaName];
-  if (resolved && typeof resolved === 'object') {
-    return resolved as Record<string, unknown>;
+  // Resolve top-level $ref first
+  if (obj.$ref && typeof obj.$ref === 'string') {
+    const match = obj.$ref.match(/#\/(?:components\/schemas|definitions)\/(.+)/);
+    if (match) {
+      const resolved = schemaMap[match[1]];
+      if (resolved && typeof resolved === 'object') {
+        // Recurse into the resolved schema in case it also has $refs
+        return resolveRef(resolved as Record<string, unknown>, schemaMap);
+      }
+    }
+    return obj;
   }
 
-  return obj;
+  // Recursively resolve nested $refs in known schema fields
+  const result: Record<string, unknown> = { ...obj };
+
+  if (result.items && typeof result.items === 'object') {
+    result.items = resolveRef(result.items as Record<string, unknown>, schemaMap);
+  }
+
+  if (result.properties && typeof result.properties === 'object') {
+    const props = result.properties as Record<string, unknown>;
+    result.properties = Object.fromEntries(
+      Object.entries(props).map(([k, v]) => [
+        k,
+        typeof v === 'object' && v !== null
+          ? resolveRef(v as Record<string, unknown>, schemaMap)
+          : v,
+      ]),
+    );
+  }
+
+  if (result.additionalProperties && typeof result.additionalProperties === 'object') {
+    result.additionalProperties = resolveRef(
+      result.additionalProperties as Record<string, unknown>,
+      schemaMap,
+    );
+  }
+
+  return result;
 }

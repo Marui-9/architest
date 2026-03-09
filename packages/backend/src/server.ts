@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { scanRoutes } from './routes/scan.js';
 import { graphRoutes } from './routes/graph.js';
 import { testRoutes } from './routes/test.js';
+import { evaluateRoutes } from './routes/evaluate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,7 @@ export async function buildApp() {
   await app.register(scanRoutes, { prefix: '/api' });
   await app.register(graphRoutes, { prefix: '/api' });
   await app.register(testRoutes, { prefix: '/api' });
+  await app.register(evaluateRoutes, { prefix: '/api' });
 
   // Health check
   app.get('/api/health', async () => ({ status: 'ok' }));
@@ -54,9 +56,25 @@ async function start() {
   try {
     await app.listen({ port, host: '0.0.0.0' });
   } catch (err) {
-    app.log.error(err);
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EADDRINUSE') {
+      app.log.error(`Port ${port} is already in use. Set a different port with PORT=<number>.`);
+    } else if (code === 'EACCES') {
+      app.log.error(
+        `Permission denied binding to port ${port}. Use a port above 1024 or run with elevated privileges.`,
+      );
+    } else {
+      app.log.error(err);
+    }
     process.exit(1);
   }
 }
 
-start();
+// Only start the server when this module is the entry point
+const isMainModule =
+  process.argv[1] &&
+  import.meta.url === `file://${process.argv[1]}`;
+
+if (isMainModule) {
+  start();
+}

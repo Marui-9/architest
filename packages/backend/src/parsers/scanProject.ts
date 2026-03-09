@@ -1,27 +1,72 @@
 import path from 'node:path';
-import type { ScanResult } from '../types.js';
+import type { ScanResult, ScanMode, InfrastructureAdapter, AdapterContext, DiscoveredService } from '../types.js';
 import { parseProjectCompose } from './dockerCompose.js';
 import { discoverOpenAPISpecs, parseOpenAPISpec } from './openapi.js';
 import { associateSpecsToServices } from './associate.js';
+import { dockerComposeAdapter, composeToDiscoveredServices } from '../adapters/dockerCompose.js';
+import { dockerDaemonAdapter } from '../adapters/dockerDaemon.js';
 
 /**
- * Scan a project directory:
- * 1. Parse docker-compose.yml
- * 2. Discover OpenAPI spec files
- * 3. Parse each discovered spec
- * 4. Associate specs to services
- *
- * Returns a complete ScanResult.
+ * Registry of available infrastructure adapters.
  */
-export async function scanProject(projectPath: string): Promise<ScanResult> {
-  // Step 1: Parse Docker Compose
-  const compose = parseProjectCompose(projectPath);
+const adapters: InfrastructureAdapter[] = [
+  dockerComposeAdapter,
+  dockerDaemonAdapter,
+];
 
-  // Step 2: Discover OpenAPI specs
+/**
+ * Select which adapters to run based on the scan mode.
+ */
+async function selectAdapters(
+  mode: ScanMode,
+  context: AdapterContext,
+): Promise<InfrastructureAdapter[]> {
+  if (mode === 'compose') {
+    return adapters.filter((a) => a.id === 'docker-compose');
+  }
+  if (mode === 'daemon') {
+    return adapters.filter((a) => a.id === 'docker-daemon');
+  }
+  // auto: return all adapters that detect something
+  const detected: InfrastructureAdapter[] = [];
+  for (const adapter of adapters) {
+    if (await adapter.detect(context)) {
+      detected.push(adapter);
+    }
+  }
+  return detected;
+}
+
+/**
+ * Merge services from multiple adapters, deduplicating by name.
+ * First adapter to claim a name wins.
+ */
+function mergeServices(serviceGroups: DiscoveredService[][]): DiscoveredService[] {
+  const seen = new Set<string>();
+  const merged: DiscoveredService[] = [];
+
+  for (const group of serviceGroups) {
+    for (const service of group) {
+      if (!seen.has(service.id)) {
+        seen.add(service.id);
+        merged.push(service);
+      }
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Discover OpenAPI specs from project root and service build contexts.
+ */
+function discoverAllSpecs(
+  projectPath: string,
+  services: DiscoveredService[],
+): string[] {
   const discoveredSpecs = discoverOpenAPISpecs(projectPath);
 
-  // Also discover specs inside each service's build context
-  for (const service of compose.services) {
+  for (const service of services) {
     if (service.build) {
       const serviceSpecs = discoverOpenAPISpecs(
         path.resolve(projectPath, service.build),
@@ -34,29 +79,90 @@ export async function scanProject(projectPath: string): Promise<ScanResult> {
     }
   }
 
-  // Step 3: Parse each spec (collect errors rather than throwing)
-  const parsedSpecs = [];
-  const parseErrors: Array<{ filePath: string; error: string }> = [];
+  return discoveredSpecs;
+}
 
-  for (const specPath of discoveredSpecs) {
+/**
+ * Scan a project directory using the adapter-based pipeline:
+ * 1. Run infrastructure adapters to discover services
+ * 2. Discover OpenAPI spec files (if projectPath available)
+ * 3. Parse each discovered spec
+ * 4. Associate specs to services
+ *
+ * Returns a complete ScanResult.
+ */
+export async function scanProject(
+  projectPath?: string,
+  mode: ScanMode = 'auto',
+): Promise<ScanResult> {
+  const context: AdapterContext = { projectPath };
+
+  // Step 1: Select and run adapters
+  const selectedAdapters = await selectAdapters(mode, context);
+
+  if (selectedAdapters.length === 0) {
+    throw new Error(
+      projectPath
+        ? `No infrastructure found in ${projectPath}. Looked for: docker-compose.yml`
+        : 'No infrastructure source available. Provide a project path or mount the Docker socket.',
+    );
+  }
+
+  const serviceGroups: DiscoveredService[][] = [];
+  for (const adapter of selectedAdapters) {
+    const discovered = await adapter.discover(context);
+    serviceGroups.push(discovered);
+  }
+
+  const allServices = mergeServices(serviceGroups);
+
+  // Step 2: Get compose result if available (for backward compat in ScanResult)
+  const parseErrors: Array<{ filePath: string; error: string }> = [];
+  let compose;
+  if (projectPath && selectedAdapters.some((a) => a.id === 'docker-compose')) {
     try {
-      const parsed = parseOpenAPISpec(specPath);
-      parsedSpecs.push(parsed);
+      compose = parseProjectCompose(projectPath);
     } catch (err) {
-      parseErrors.push({
-        filePath: specPath,
-        error: err instanceof Error ? err.message : 'Unknown error',
-      });
+      // Compose result is optional metadata when the adapter already provided services.
+      // Track the error for visibility but don't fail the scan.
+      const message = err instanceof Error ? err.message : String(err);
+      parseErrors.push({ filePath: `${projectPath}/docker-compose.yml`, error: message });
+    }
+  }
+
+  // Step 3: Discover and parse OpenAPI specs (only if we have a project path)
+  let discoveredSpecs: string[] = [];
+  const parsedSpecs = [];
+
+  if (projectPath) {
+    discoveredSpecs = discoverAllSpecs(projectPath, allServices);
+
+    for (const specPath of discoveredSpecs) {
+      try {
+        const parsed = parseOpenAPISpec(specPath);
+        parsedSpecs.push(parsed);
+      } catch (err) {
+        parseErrors.push({
+          filePath: specPath,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 
   // Step 4: Associate specs to services
-  const services = associateSpecsToServices(compose.services, parsedSpecs, projectPath);
+  const services = associateSpecsToServices(
+    allServices,
+    parsedSpecs,
+    projectPath ?? '',
+  );
 
   return {
     projectPath,
+    mode,
     compose,
     discoveredSpecs,
     services,
+    parseErrors,
   };
 }

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { DockerService, OpenAPIResult, EnrichedService } from '../types.js';
+import type { DiscoveredService, OpenAPIResult, EnrichedService } from '../types.js';
 import { discoverServiceSpecs } from './openapi.js';
 
 /**
@@ -20,7 +20,7 @@ function extractPortFromUrl(url: string): number | null {
 }
 
 /**
- * Associate OpenAPI specs with Docker Compose services.
+ * Associate OpenAPI specs with discovered services.
  *
  * Matching strategies (in priority order):
  * 1. **Build context co-location:** If a service has a `build` context, search for
@@ -31,7 +31,7 @@ function extractPortFromUrl(url: string): number | null {
  * Each service gets at most one OpenAPI spec. Each spec is consumed at most once.
  */
 export function associateSpecsToServices(
-  services: DockerService[],
+  services: DiscoveredService[],
   parsedSpecs: OpenAPIResult[],
   projectPath: string,
 ): EnrichedService[] {

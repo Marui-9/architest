@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { associateSpecsToServices } from './associate.js';
-import type { DockerService, OpenAPIResult } from '../types.js';
+import type { DiscoveredService, OpenAPIResult } from '../types.js';
 
-function makeService(overrides: Partial<DockerService> & { name: string }): DockerService {
+function makeService(overrides: Partial<DiscoveredService> & { name: string }): DiscoveredService {
   return {
+    id: overrides.name,
+    source: 'docker-compose',
+    serviceType: 'service',
+    metadata: {},
     ports: [],
     dependsOn: [],
     ...overrides,

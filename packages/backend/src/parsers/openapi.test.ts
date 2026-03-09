@@ -248,8 +248,8 @@ describe('parseOpenAPISpec', () => {
     expect(result.endpoints).toHaveLength(1);
     expect(result.endpoints[0].method).toBe('GET');
     expect(result.endpoints[0].path).toBe('/items');
-    // $ref should be resolved
-    expect(result.endpoints[0].responses[0].schema).toHaveProperty('properties');
+    // $ref inside items should be resolved — schema is type:array, so properties live under items
+    expect(result.endpoints[0].responses[0].schema).toHaveProperty('items.properties');
   });
 
   it('resolves $ref to components/schemas', () => {
@@ -276,7 +276,17 @@ describe('parseOpenAPISpec', () => {
 
   it('throws on invalid JSON', () => {
     const specPath = writeFile(tmpDir, 'bad.json', '{invalid json}');
-    expect(() => parseOpenAPISpec(specPath)).toThrow('Failed to parse');
+    expect(() => parseOpenAPISpec(specPath)).toThrow('Malformed JSON');
+  });
+
+  it('includes file path in JSON parse errors', () => {
+    const specPath = writeFile(tmpDir, 'bad2.json', '{invalid json}');
+    expect(() => parseOpenAPISpec(specPath)).toThrow('bad2.json');
+  });
+
+  it('throws on invalid YAML with line info', () => {
+    const specPath = writeFile(tmpDir, 'bad.yml', 'openapi: 3.0\npaths: [\ninvalid');
+    expect(() => parseOpenAPISpec(specPath)).toThrow(/Malformed YAML.*at line \d+/);
   });
 
   it('throws on non-OpenAPI file', () => {

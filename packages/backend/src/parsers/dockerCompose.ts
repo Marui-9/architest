@@ -101,14 +101,31 @@ export function parseDockerCompose(filePath: string): DockerComposeResult {
     throw new Error(`Docker Compose file not found: ${filePath}`);
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8');
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, 'utf-8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') {
+      throw new Error(`Permission denied reading ${filePath}. Check file permissions.`);
+    }
+    if (code === 'EISDIR') {
+      throw new Error(`Expected a file but found a directory: ${filePath}`);
+    }
+    throw new Error(`Cannot read ${filePath}: ${(err as Error).message ?? String(err)}`);
+  }
 
   let doc: Record<string, unknown>;
   try {
     doc = yaml.load(content) as Record<string, unknown>;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown YAML parse error';
-    throw new Error(`Failed to parse YAML in ${filePath}: ${message}`);
+    const yamlErr = err as { mark?: { line?: number; column?: number }; message?: string };
+    const position = yamlErr.mark
+      ? ` at line ${(yamlErr.mark.line ?? 0) + 1}, column ${(yamlErr.mark.column ?? 0) + 1}`
+      : '';
+    throw new Error(
+      `Malformed YAML in ${filePath}${position}: ${yamlErr.message ?? String(err)}`,
+    );
   }
 
   if (!doc || typeof doc !== 'object') {
@@ -161,7 +178,7 @@ export function parseProjectCompose(projectPath: string): DockerComposeResult {
   const filePath = findComposeFile(projectPath);
   if (!filePath) {
     throw new Error(
-      `No Docker Compose file found in ${projectPath}. Looked for: ${COMPOSE_FILENAMES.join(', ')}`,
+      `Docker Compose file not found in ${projectPath}. Looked for: ${COMPOSE_FILENAMES.join(', ')}`,
     );
   }
   return parseDockerCompose(filePath);

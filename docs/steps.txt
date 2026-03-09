@@ -1,0 +1,22 @@
+Step 2: Refactor types to be source-agnostic (1-2 days)
+The current types in types.ts are hardcoded to Docker Compose. The MVP needs a DiscoveredService type with a source field and an InfrastructureAdapter interface so that Docker Compose is one adapter and the Docker daemon can be another. The existing DockerService maps cleanly — it's mostly renaming + adding a source field. The scan orchestrator in scanProject.ts becomes adapter-aware: detect which adapters apply, run them, merge results, then enrich with OpenAPI specs as a separate pass. Existing tests should still pass after this refactor.
+
+Step 3: Docker daemon adapter (2-3 days)
+Install dockerode. Create src/adapters/dockerDaemon.ts that talks to /var/run/docker.sock, lists running containers, extracts names/images/ports/networks, and infers dependencies from shared user-defined networks. Add a mode parameter to POST /api/scan ("compose" | "daemon" | "auto"). This is the zero-config path that expands the TAM — a user with any Docker setup gets a working graph without a compose file.
+Step 4: Graph builder (2-3 days)
+The current graph.ts returns { nodes: [], edges: [] }. Build the real buildGraph(scanResult) function that creates one node per service (with type classification from image names) and one edge per dependency relationship — all dependencies, not just OpenAPI ones. Edges typed as api, dependency, or datastore. Add dagre auto-layout for positioning. Wire GET /api/graph and GET /api/graph/edge/:id to the in-memory graph state.
+
+Step 5: Architecture guardrails (3-4 days)
+Rule engine + 10 built-in rules (no-public-db, circular-dependency, missing-healthcheck, etc.) + scorer (0-100). These work on graph structure alone — no API specs needed. GET /api/evaluate returns findings + score. This is Layer 2 value and it's the first thing users see after scanning.
+
+Step 6: Frontend — graph canvas (5-6 days)
+This is the biggest single block. Install React Flow + Zustand. Build: landing screen with two scan modes (project path input + "scan running containers" button), custom ServiceNode (name, port, type icon, finding badge), custom ContractEdge (directional, colored by status, typed by edge kind), canvas with pan/zoom/minimap, dagre auto-layout, score badge overlay, dark-mode theming throughout.
+
+Step 7: Frontend — inspection panel + test runner (5-6 days)
+Click an edge → right-side panel slides in. For API edges: endpoint list, "Run Test" button, inline results. For non-API edges: connection info, "Check Connection" health probe. Contract runner uses Playwright's APIRequestContext + Ajv for schema validation. Health probe uses TCP/HTTP connectivity check. WebSocket streaming for live result updates. Edge colors update on the canvas after tests.
+
+Step 8: Error handling (2-3 days)
+Missing files, malformed YAML, invalid specs, unreachable containers, Docker socket not mounted — every error path gets a clear, actionable message instead of a stack trace.
+
+Step 9: Polish & ship (3-4 days)
+UI transitions, loading states, keyboard shortcuts, Docker image optimization (<500 MB), E2E smoke tests for both scan modes, README with screenshots and volume mount examples for all platforms.

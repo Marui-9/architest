@@ -1,0 +1,32 @@
+how to verify everything:
+
+1. Run all tests (automated)
+npm test 
+
+2. Run the app locally
+Terminal 1 — backend (port 3000):
+cd packages/backend && npm run dev
+Terminal 2 — frontend (Vite dev server, port 5173):
+cd packages/frontend && npm run dev
+Open http://localhost:5173 in a browser.
+
+3. Manual smoke tests
+Scenario	What to do	What to expect
+Compose scan	Enter the path to a project with a docker-compose.yml (e.g. the built-in fixture at sample-project) and click Scan	Graph renders with service nodes and edges
+Docker daemon scan	Click "Scan Running Containers" (requires Docker running with containers up)	Graph of running containers appears
+Bad path	Enter /nonexistent/path and scan	Red banner: "Project path does not exist"
+Bad YAML	Point to a dir with a malformed docker-compose.yml	Red banner with "Malformed YAML" and line/column info
+No Docker socket	Run without Docker mounted	Daemon scan returns a clear "Cannot connect to Docker daemon" message
+Edge inspection	Click any edge on the graph	Right panel slides in with connection details
+Contract test	Click an API edge → "Run Test"	Results stream in per-endpoint
+Health probe	Click any edge → "Check Connection"	Pass/fail with latency
+
+
+4. Docker (production mode)
+docker compose -f docker-compose.dev.yml up --build	
+Then visit http://localhost:3000. Mount the Docker socket to test daemon scanning:
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 architest
+
+5. TypeScript build check
+cd packages/backend && npx tsc -b
+cd packages/frontend && npx tsc -b && npx vite build

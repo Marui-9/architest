@@ -1,123 +1,131 @@
 # ArchiTest
 
-**A local-first visual contract testing tool that converts Docker + OpenAPI systems into an executable architecture map.**
+**Point at your infrastructure. See it, score it, test it.**
 
-ArchiTest lets teams see and verify service integrations instantly. Point it at your Docker Compose project, and it builds a live graph where every service connection is an executable contract test.
+ArchiTest is a local-first tool that discovers your containerized services, renders them as an interactive architecture graph, scores your setup against architecture quality rules, and — when API specs are present — runs live contract tests against running containers.
+
+No config files to write. No agents to install. No data leaves your machine.
 
 ---
 
 ## Quick Start
 
+### Scan running containers (zero-config)
+
 ```bash
-docker run -p 3000:3000 architest/core
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 architest/core
+```
+
+### Scan a project folder
+
+```bash
+docker run -v $(pwd):/project -p 3000:3000 architest/core
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## How It Works
+---
 
-### 1. Connect a Repository
+## What It Does
 
-Select your local project folder. ArchiTest deterministically parses:
+ArchiTest delivers value in three layers. Each layer works independently — you don't need API specs or running containers to get useful output.
 
-- `docker-compose.yml` — discovers services, ports, and dependencies
-- OpenAPI spec files — discovers API contracts
+### Layer 1: See It — Architecture Discovery
 
-No AI. No heuristics. Deterministic parsing only.
+ArchiTest discovers services from multiple sources:
 
-### 2. Architecture Map
+- **Docker Compose** — parses `docker-compose.yml` to extract services, ports, and dependencies
+- **Docker daemon** — inspects running containers via the Docker socket to map live architecture (no compose file needed)
 
-A dark-mode graph canvas renders your system:
+Every discovered service becomes a **node** on a dark-mode graph canvas. Every dependency becomes a **directional edge**. Services are classified by type — application, datastore, cache, message broker — and styled accordingly.
 
-**Nodes** — one per Docker service (e.g. `frontend`, `user-api`, `postgres`), showing:
-- Service name
-- Exposed port
-- OpenAPI availability indicator
+No AI. No heuristics. Deterministic parsing and live inspection.
 
-**Edges** — created when a service `depends_on` another that exposes an OpenAPI spec. Each edge represents a *consumer → provider API contract*.
+### Layer 2: Score It — Architecture Guardrails
 
-### 3. Inspect Edges
+Without any API specs, ArchiTest evaluates your architecture against a built-in rule library:
 
-Click any edge to open the inspection panel:
+| Rule | What it catches |
+|------|----------------|
+| `no-public-db` | Database or cache services exposing ports to the host |
+| `no-latest-tag` | Images using `:latest` instead of pinned versions |
+| `circular-dependency` | Circular dependency chains between services |
+| `missing-healthcheck` | Services without a healthcheck definition |
+| `no-restart-policy` | Services without a restart policy |
+| `no-resource-limits` | Services without memory or CPU constraints |
+| `excessive-dependencies` | Services with too many direct dependencies |
+| `orphan-service` | Services with no connections and no exposed ports |
+| ... | And more |
 
-- Detected base URL
-- All endpoints from the provider's OpenAPI spec (method + route)
-- Expected response codes
-- Response schema summary
+Results produce a **0–100 architecture score** with a category breakdown (security, reliability, architecture, hygiene) and actionable remediation for each finding.
 
-Select an endpoint to generate a contract test.
+### Layer 3: Test It — Contract Verification
 
-### 4. Run Contract Tests
+When OpenAPI specs are present, ArchiTest unlocks full contract testing:
 
-ArchiTest generates and executes a [Playwright](https://playwright.dev/) API test that:
+- Click any API edge to see all endpoints (method, route, expected responses, schema)
+- Run a contract test with one click — ArchiTest sends a real HTTP request to the live container and validates the response status code and body against the OpenAPI spec
+- Edge colors update in real time: **gray** (untested), **green** (verified), **red** (failed), **yellow** (schema mismatch)
 
-- Sends a request to the live service container
-- Validates the status code against the OpenAPI spec
-- Validates the response body against the OpenAPI schema
-
-It deliberately does **not** assert business logic, validate DB state, or require auth flows.
-
-### 5. Visual Feedback
-
-Edges update in real time:
-
-| Color  | Meaning                   |
-|--------|---------------------------|
-| Gray   | Not tested                |
-| Green  | Contract verified         |
-| Red    | Contract failed           |
-| Yellow | Spec mismatch detected    |
-
-Hover any edge to see: last run timestamp, response time, status code, and failure reason (if applicable).
-
-> The green arrow moment is the product.
+Even without specs, every edge supports **health-probe testing** — a connectivity check that verifies the target service is reachable. No edge is untestable.
 
 ---
 
-## What the MVP Does NOT Do
+## Three Ways to Use It
 
-To keep scope sharp, the MVP explicitly excludes:
+**1. Zero-config live scan** — Mount the Docker socket. Click "Scan running containers." See your running architecture immediately, regardless of how it was deployed.
 
-- Browser automation
-- Test editing UI
-- Multi-environment support
-- CI integration
-- AI-generated tests
-- Drift detection beyond basic spec mismatch
+**2. Compose analysis** — Point it at a project folder with a `docker-compose.yml`. Get topology visualization and architecture findings. No specs or running containers required.
 
-These are planned for future phases.
+**3. Full contract testing** — Project folder with Docker Compose + OpenAPI specs + running containers. The full experience: graph, score, and live contract verification.
+
+---
+
+## What It Doesn't Do
+
+The MVP is deliberately scoped:
+
+- No browser automation — API testing only
+- No test editing UI — tests are generated and run internally
+- No CI integration — local-first only (CI is planned post-MVP)
+- No AI — everything is deterministic
+- No multi-environment support — single environment per scan
 
 ---
 
 ## Differentiation
 
-| Tool       | What It Does            | Why ArchiTest Is Different             |
-|------------|-------------------------|----------------------------------------|
-| Postman    | Manual API testing      | Not architecture-aware                 |
-| Swagger UI | Spec visualization      | Not executable system-wide             |
-| Playwright | Code-based testing      | No architectural abstraction           |
+| Tool | What It Does | ArchiTest's Difference |
+|------|-------------|----------------------|
+| Postman | Manual API testing | Not architecture-aware |
+| Swagger UI | Spec visualization | Not executable, not system-wide |
+| Playwright | Code-based testing | No architectural abstraction |
+| Docker Desktop | Container management | No dependency graph, no quality scoring |
+| YAML linters | Syntax checking | No architectural analysis or contract testing |
 
-**ArchiTest's core abstraction:** *service edge = executable contract.*
+ArchiTest's core abstraction: **infrastructure in → architecture graph + quality score + executable contract tests.**
 
 ---
 
-## Ideal Users
+## Who It's For
 
-- Teams using Docker Compose locally
-- Backend-first SaaS startups
-- Platform engineers enforcing API contracts
-- Microservice teams with OpenAPI discipline
+- Any team running Docker containers locally
+- Backend teams building microservices
+- Platform engineers reviewing architecture quality
+- Teams with OpenAPI specs who want instant contract validation
+- Developers who want to understand their system topology without reading YAML
 
 ---
 
 ## Roadmap
 
-- Authentication helpers (token auto-injection)
-- Frontend → API E2E via Playwright browser mode
-- CI mode with JSON export
-- Drift detection on PRs
-- Historical integration health tracking
-- Multi-repo service graph
+- Kubernetes manifest parsing (Helm, Kustomize, raw YAML)
+- CI/CD integration with PR-blocking policy checks
+- CLI mode (`npx architest scan`)
+- Historical tracking and architecture drift detection
+- Authentication helpers for contract tests
+- GraphQL and gRPC spec support
+- Hosted SaaS with team dashboards and alerting
 
 ---
 

@@ -14,9 +14,11 @@ describe('scanProject', () => {
 
     // Basic structure
     expect(result.projectPath).toBe(sampleProject);
+    expect(result.mode).toBe('auto');
     expect(result.compose).toBeDefined();
     expect(result.services).toBeDefined();
     expect(Array.isArray(result.discoveredSpecs)).toBe(true);
+    expect(Array.isArray(result.parseErrors)).toBe(true);
   });
 
   it('parses all 4 services from docker-compose.yml', async () => {
@@ -28,6 +30,19 @@ describe('scanProject', () => {
     expect(names).toContain('frontend');
     expect(names).toContain('postgres');
     expect(result.services).toHaveLength(4);
+  });
+
+  it('discovered services have source-agnostic fields', async () => {
+    const result = await scanProject(sampleProject);
+
+    const userApi = result.services.find((s) => s.name === 'user-api');
+    expect(userApi?.source).toBe('docker-compose');
+    expect(userApi?.id).toBe('user-api');
+    expect(userApi?.serviceType).toBe('service');
+    expect(userApi?.metadata).toBeDefined();
+
+    const postgres = result.services.find((s) => s.name === 'postgres');
+    expect(postgres?.serviceType).toBe('datastore');
   });
 
   it('resolves depends_on correctly', async () => {
@@ -84,6 +99,12 @@ describe('scanProject', () => {
   });
 
   it('throws when project has no docker-compose file', async () => {
-    await expect(scanProject('/nonexistent/path')).rejects.toThrow('No Docker Compose file found');
+    await expect(scanProject('/nonexistent/path')).rejects.toThrow('No infrastructure found');
+  });
+
+  it('supports explicit compose mode', async () => {
+    const result = await scanProject(sampleProject, 'compose');
+    expect(result.mode).toBe('compose');
+    expect(result.services.length).toBeGreaterThan(0);
   });
 });

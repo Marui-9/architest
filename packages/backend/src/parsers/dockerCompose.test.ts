@@ -235,7 +235,12 @@ services:
 
   it('throws on invalid YAML', () => {
     const composePath = writeFile(tmpDir, 'bad.yml', '{{{{invalid yaml');
-    expect(() => parseDockerCompose(composePath)).toThrow('Failed to parse YAML');
+    expect(() => parseDockerCompose(composePath)).toThrow('Malformed YAML');
+  });
+
+  it('includes line/column in YAML parse errors', () => {
+    const composePath = writeFile(tmpDir, 'bad2.yml', 'services:\n  app: [\ninvalid');
+    expect(() => parseDockerCompose(composePath)).toThrow(/at line \d+, column \d+/);
   });
 
   it('throws when services key is missing', () => {
@@ -249,7 +254,7 @@ services:
 describe('parseProjectCompose', () => {
   it('throws when no compose file exists in directory', () => {
     const tmpDir = createTempDir();
-    expect(() => parseProjectCompose(tmpDir)).toThrow('No Docker Compose file found');
+    expect(() => parseProjectCompose(tmpDir)).toThrow('Docker Compose file not found');
     cleanDir(tmpDir);
   });
 
