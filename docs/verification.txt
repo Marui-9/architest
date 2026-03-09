@@ -30,3 +30,10 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 architest
 5. TypeScript build check
 cd packages/backend && npx tsc -b
 cd packages/frontend && npx tsc -b && npx vite build
+
+
+test
+/home/jacob/Desktop/code/architest/packages/backend/src/parsers/__fixtures__/sample-project
+
+in case port 3000 is marked as in use 
+kill $(lsof -t -i :3000 2>/dev/null) 2>/dev/null; sleep 1; echo "port 3000 freed"
