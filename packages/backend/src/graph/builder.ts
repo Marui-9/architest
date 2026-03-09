@@ -1,4 +1,4 @@
-import dagre from '@dagrejs/dagre';
+import dagreImport from '@dagrejs/dagre';
 import type {
   ScanResult,
   EnrichedService,
@@ -7,6 +7,9 @@ import type {
   GraphEdge,
   EdgeType,
 } from '../types.js';
+
+// Handle ESM/CJS interop: some bundlers double-wrap the default export
+const dagre = (dagreImport as unknown as { default?: typeof dagreImport }).default ?? dagreImport;
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
