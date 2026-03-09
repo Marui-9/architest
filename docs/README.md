@@ -2,9 +2,9 @@
 
 **Point at your infrastructure. See it, score it, test it.**
 
-ArchiTest is a local-first tool that discovers your containerized services, renders them as an interactive architecture graph, scores your setup against architecture quality rules, and — when API specs are present — runs live contract tests against running containers.
+ArchiTest is a local-first tool that discovers your containerized services, renders them as an interactive architecture graph, scores your setup against architecture quality rules, and  runs live contract tests against running containers when API specs are present.
 
-No config files to write. No agents to install. No data leaves your machine.
+No data leaves your machine. No config files to write. No agents to install.
 
 ---
 
