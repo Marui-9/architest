@@ -13,7 +13,7 @@ FROM node:22-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/backend/package.json ./packages/backend/
-RUN npm ci --workspace=packages/backend --omit=dev
+RUN npm ci --workspace=packages/backend
 COPY packages/backend/ ./packages/backend/
 COPY tsconfig.base.json ./
 RUN npm run build --workspace=packages/backend

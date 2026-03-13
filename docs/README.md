@@ -13,13 +13,13 @@ No data leaves your machine. No config files to write. No agents to install.
 ### Scan running containers (zero-config)
 
 ```bash
-docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 architest/core
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 jacobmarui/architest
 ```
 
 ### Scan a project folder
 
 ```bash
-docker run -v $(pwd):/project -p 3000:3000 architest/core
+docker run -v $(pwd):/project -p 3000:3000 jacobmarui/architest
 ```
 
 Open [http://localhost:3000](http://localhost:3000).

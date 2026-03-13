@@ -37,3 +37,14 @@ test
 
 in case port 3000 is marked as in use 
 kill $(lsof -t -i :3000 2>/dev/null) 2>/dev/null; sleep 1; echo "port 3000 freed"
+
+For docker as per README.md
+from architest root
+docker build -t architest:local .
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 architest:local
+
+for actual docker availability outside of my own pc 
+docker build -t architest/core .
+docker build -t yourusername/architest:latest .
+docker push yourusername/architest:latest
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 3000:3000 yourusername/architest:latest
